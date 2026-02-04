@@ -1,0 +1,9 @@
+../Core/Src/main.c:82:6:HAL_FDCAN_RxFifo1Callback	5
+../Core/Src/main.c:118:6:HAL_FDCAN_RxFifo0Callback	4
+../Core/Src/main.c:151:5:main	6
+../Core/Src/main.c:259:6:SystemClock_Config	4
+../Core/Src/main.c:319:13:MX_FDCAN1_Init	3
+../Core/Src/main.c:386:13:MX_FDCAN2_Init	3
+../Core/Src/main.c:454:13:MX_USART3_UART_Init	5
+../Core/Src/main.c:502:13:MX_GPIO_Init	1
+../Core/Src/main.c:548:6:Error_Handler	1
