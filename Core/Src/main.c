@@ -96,7 +96,7 @@ void HAL_FDCAN_RxFifo1Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo1ITs)
       Error_Handler();
     }
 
-	  sprintf ((char *)TxData2, "FDCAN2TX %d", indx++);
+	  sprintf ((char *)TxData2, "PONG %d", indx++);
 
 	  char uartBuf[100];
 	  sprintf(uartBuf, "Received from FDCAN1: %.*s\r\n", 12, RxData2);
@@ -179,7 +179,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   /*uart test*/
-  HAL_UART_Transmit(&huart3, (uint8_t*)"Hello\r\n", 7, 100);
+ // HAL_UART_Transmit(&huart3, (uint8_t*)"Hello\r\n", 7, 100);
 
   // STart FDCAN1
   if(HAL_FDCAN_Start(&hfdcan1)!= HAL_OK)
@@ -237,7 +237,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  sprintf ((char *)TxData1, "FDCAN1TX %d", indx++);
+	  sprintf ((char *)TxData1, "PING %d", indx++);
 
 	  if (HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &TxHeader1, TxData1)!= HAL_OK)
 	  {
