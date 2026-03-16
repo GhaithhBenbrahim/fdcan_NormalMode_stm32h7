@@ -1,0 +1,130 @@
+@startuml UDS_0x29_Authentication_Flow
+
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 150
+skinparam ParticipantPadding 20
+skinparam BoxPadding 10
+
+box "VCI Board (Tester)" #LightBlue
+participant App as "VCI App\n(GUI/Task)"
+participant VC as "VCI UDS\nClient"
+participant VCAL as "VCI CAL\n(mbedTLS)"
+end box
+
+participant IT as "ISO-TP\n(CAN FD)"
+
+box "ECU Board" #LightGreen
+participant ECAL as "ECU CAL\n(mbedTLS)"
+participant ES as "ECU UDS\nServer"
+end box
+
+== PHASE 1: VCU Request (0x01) ==
+App -> VC: app_start_auth()
+activate VC
+VC -> VC: uds_0x29_client_build_vcu()
+
+VC -> IT: isotp_send(\n [0x29, 0x01, cert...] \n)
+deactivate VC
+note right of IT: Transmitted over CAN FD\n(Extended FF up to 15KB)
+
+IT -> ES: on_isotp_rx() -> uds_core_process()
+activate ES
+ES -> ES: uds_0x29_decode_vcu_request()
+
+ES -> ECAL: cal_cert_verify_chain(client_cert, ca_cert)
+activate ECAL
+note right of ECAL: [mbedtls_x509_crt_verify]\n~121ms
+ECAL -->> ES: CAL_OK + client_pubkey
+deactivate ECAL
+
+ES -> ECAL: cal_rng()
+activate ECAL
+ECAL -->> ES: challenge_server (32B)
+deactivate ECAL
+
+ES -> ECAL: cal_keygen(CAL_ALG_ECDSA_P256)
+activate ECAL
+note right of ECAL: [mbedtls_ecp_gen_keypair]\n~56ms
+ECAL -->> ES: eph_pub_server + eph_priv_server
+deactivate ECAL
+
+ES -> IT: uds_0x29_encode_vcu_response()\n-> isotp_send()
+deactivate ES
+
+== PHASE 2: POWN Request (0x03) ==
+IT -> VC: on_isotp_rx(\n [0x69, 0x01, challenge, eph_pub] \n)
+activate VC
+VC -> VC: uds_0x29_client_process_vcu_response()
+
+VC -> VCAL: cal_keygen(CAL_ALG_ECDSA_P256)
+activate VCAL
+note left of VCAL: [mbedtls_ecp_gen_keypair]\n~56ms
+VCAL -->> VC: eph_pub_client + eph_priv_client
+deactivate VCAL
+
+VC -> VCAL: cal_sign(priv_client, auth_token)
+activate VCAL
+note left of VCAL: [mbedtls_ecdsa_write_signature]\n~63ms
+VCAL -->> VC: signature (DER)
+deactivate VCAL
+
+VC -> IT: isotp_send(\n [0x29, 0x03, sig, eph_pub...] \n)
+deactivate VC
+
+IT -> ES: on_isotp_rx() -> uds_core_process()
+activate ES
+ES -> ES: uds_0x29_decode_pown_request()
+
+ES -> ECAL: cal_verify(client_pubkey, auth_token, sig)
+activate ECAL
+note right of ECAL: [mbedtls_ecdsa_read_signature]\n~122ms
+ECAL -->> ES: CAL_OK
+deactivate ECAL
+
+== PHASE 3: Session Key Derivation ==
+
+ES -> ECAL: cal_ecdh_shared_secret(\n eph_priv_server, eph_pub_client \n)
+activate ECAL
+ECAL -->> ES: shared_secret_server (32B)
+deactivate ECAL
+
+ES -> ECAL: cal_hkdf(shared_secret_server, salt=challenge_server)
+activate ECAL
+ECAL -->> ES: session_key_server (32B)
+deactivate ECAL
+
+ES -> ECAL: cal_hmac_sha256(session_key_server)
+activate ECAL
+ECAL -->> ES: session_key_info (MAC)
+deactivate ECAL
+
+ES -> IT: uds_0x29_encode_pown_response(session_key_info)\n-> isotp_send()
+deactivate ES
+
+IT -> VC: on_isotp_rx(\n [0x69, 0x03, session_key_info] \n)
+activate VC
+VC -> VC: uds_0x29_client_process_pown_response()
+
+VC -> VCAL: cal_ecdh_shared_secret(\n eph_priv_client, eph_pub_server \n)
+activate VCAL
+VCAL -->> VC: shared_secret_client (Matches Server)
+deactivate VCAL
+
+VC -> VCAL: cal_hkdf(shared_secret_client, salt=challenge_server)
+activate VCAL
+VCAL -->> VC: session_key_client (Matches Server)
+deactivate VCAL
+
+VC -> VCAL: cal_hmac_sha256(session_key_client)
+activate VCAL
+VCAL -->> VC: expected_mac
+deactivate VCAL
+
+VC -> VC: memcmp(expected_mac, received_session_key_info) == 0
+
+VC -> App: State = UDS_CLI_STATE_AUTHENTICATED
+deactivate VC
+
+== AUTHENTICATED: AES-256-GCM Session Established ==
+
+@enduml

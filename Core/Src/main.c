@@ -126,10 +126,12 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
     Error_Handler();
     }
 
+
     char uartBuf[100];
     sprintf(uartBuf, "Received from FDCAN2: %.*s\r\n", 12, RxData1);
 
     HAL_UART_Transmit(&huart3, (uint8_t*)uartBuf, strlen(uartBuf), 100);
+
 
 
     if (HAL_FDCAN_ActivateNotification(hfdcan, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) != HAL_OK)
@@ -243,7 +245,14 @@ int main(void)
 	  {
 	   Error_Handler();
 	  }
-	  HAL_Delay (1000);
+
+	  /*
+      char uartBuf[100];
+      sprintf(uartBuf, "sent from FDCAN1: %.*s\r\n", 12, TxData1);
+
+	  HAL_UART_Transmit(&huart3, (uint8_t*)uartBuf, strlen(uartBuf), 100);
+	  */
+	  HAL_Delay (10);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
